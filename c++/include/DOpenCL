@@ -1,0 +1,84 @@
+#include <DOpenCL.h>
+
+DCLBuffer::DCLBuffer(DOpenCL *fa, cl_mem_flags flags, void *p, int sz) : ptr(p),size(sz),flag(flags),father(fa) {
+    fa->bufList.push_back(this);
+    DCL_ERROR_HEAD
+	ra=rb=1;
+    buffer=0;
+    if (size) buffer=new cl::Buffer(*(fa->context),flag,size);
+    DCL_ERROR_CATCH("new buffer")
+}
+
+void DCLBuffer::beforeRun() {
+    father->cmdQueue->enqueueWriteBuffer(*((cl::Buffer*)buffer), CL_TRUE, 0, size, ptr);
+}
+
+void DCLBuffer::afterRun() {
+    father->cmdQueue->enqueueReadBuffer(*((cl::Buffer*)buffer), CL_TRUE, 0, size, ptr);
+}
+
+DCLFunction::DCLFunction(DOpenCL *fa, string fileName, string kernelName, string buildOpt) {
+	father=fa;
+    global=cl::NDRange(father->calcUnit());
+    local=cl::NDRange();
+	DCL_ERROR_HEAD
+
+	src = new cl::Program::Sources(
+        1,
+        make_pair(getAllFile(fileName.c_str()) ,0)
+    );
+
+	program=new cl::Program(*(fa->context), *src);
+
+	stringstream ss;
+	srand(time(0));
+	ss<<"-DRD"<<rand()<<rand()<<rand()<<clock()<<" "<<buildOpt;
+	cout<<ss.str()<<endl;
+	program->build(fa->deviceList, ss.str().c_str());
+
+	string buildInfo = program->getBuildInfo<CL_PROGRAM_BUILD_LOG>(father->deviceList[father->did]);
+	if (buildInfo.size()>1) {
+	    cerr<<buildInfo<<endl;
+	    exit(1);
+	} else
+	    cout<<fileName<<": Build success\n";
+
+	kernel=new cl::Kernel(*program, kernelName.c_str());
+
+	DCL_ERROR_BUILD_CATCH
+}
+
+void DCLFunction::clearArg() {
+	argv.clear();
+}
+
+void DCLFunction::setArg(DCLBuffer* buffer) {
+	DCL_ERROR_HEAD
+	argv.push_back(buffer);
+	kernel->setArg(argv.size()-1, *(buffer->buffer));
+	DCL_ERROR_CATCH("setArg")
+}
+
+void DCLFunction::setArg(initializer_list<DCLBuffer*> list) {
+	clearArg();
+	for (auto x : list) setArg(x);
+}
+
+void DCLFunction::run() {
+	DCL_ERROR_HEAD
+
+	for (auto x : argv)
+		if (x->rb) x->beforeRun();
+
+	father->cmdQueue->enqueueNDRangeKernel(*kernel, cl::NDRange(), global, local);
+
+	for (auto x : argv)
+		if (x->ra) x->afterRun();
+
+	DCL_ERROR_CATCH("run")
+}
+
+void DCLFunction::run(initializer_list<DCLBuffer*> arg) {
+    setArg(arg);
+    run();
+}
