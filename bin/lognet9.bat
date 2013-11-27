@@ -1,0 +1,1 @@
+lftp rug.net9.org -p 2100 -u ai9,helloai9

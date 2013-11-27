@@ -72,8 +72,14 @@ struct DCLFunction {
     cl::Program::Sources *src;
 
 	DCLFunction(DOpenCL *fa, string fileName, string kernelName, string buildOpt);
-	void setGlobal(cl::NDRange rg) {global=rg;}
+    void setGlobal(cl::NDRange rg) {global=rg;}
+    void setGlobal(int a) {global=cl::NDRange(a);}
+    void setGlobal(int a, int b) {global=cl::NDRange(a,b);}
+    void setGlobal(int a, int b, int c) {global=cl::NDRange(a,b,c);}
 	void setLocal(cl::NDRange rg) {local=rg;}
+    void setLocal(int a) {local=cl::NDRange(a);}
+    void setLocal(int a, int b) {local=cl::NDRange(a,b);}
+    void setLocal(int a, int b, int c) {local=cl::NDRange(a,b,c);}
 	void clearArg();
 	void setArg(DCLBuffer*);
 	void setArg(initializer_list<DCLBuffer*>);
@@ -159,7 +165,7 @@ struct DOpenCL {
 		#undef DEL
     }
 
-    void init(int pid=1, int did=0) {
+    void init(int pid=0, int did=0) {
     	this->pid=pid, this->did=did;
     	DCL_ERROR_HEAD
 
@@ -176,7 +182,7 @@ struct DOpenCL {
     	DCL_ERROR_CATCH("init")
     }
 
-    void init(HGLRC glContext, HDC glDisplay, int pid=1, int did=0) {
+    void init(HGLRC glContext, HDC glDisplay, int pid=0, int did=0) {
     	this->pid=pid, this->did=did;
     	DCL_ERROR_HEAD
 

@@ -3,6 +3,8 @@
 
 #include <DOpenCL.h>
 #include <QGLFunctions>
+#include <QOpenGLFunctions_3_0>
+#include <QDebug>
 
 struct DCLGL : public DOpenCL {
     QGLFunctions *gl;
@@ -74,13 +76,14 @@ struct DCLImageGL : public DCLBuffer, public QGLFunctions {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, id, 0);
     }
 
-    DCLImageGL(DOpenCL *fa, GLsizei w, GLsizei h, GLenum _i=GL_RGBA, GLenum _t = GL_BYTE)
+    DCLImageGL(DOpenCL *fa, GLsizei w, GLsizei h, GLenum _i=GL_RGBA32F, GLenum _t = GL_FLOAT, GLenum ls = GL_LUMINANCE)
       : DCLBuffer(fa), QGLFunctions(QGLContext::currentContext()), internalformat(_i), type(_t), width(w), height(h) {
         DCL_ERROR_HEAD
 
         glGenTextures(1,&id);
         bind();
-        glTexImage2D(GL_TEXTURE_RECTANGLE, 0, internalformat, width, height, 0, internalformat, type, 0);
+        glTexImage2D(GL_TEXTURE_RECTANGLE, 0, internalformat, width, height, 0, ls, type, 0);
+        ((DCLGL*)fa)->printGLError();
 
         buffer=new cl::Image2DGL(*(fa->context), flag, GL_TEXTURE_RECTANGLE, 0, id);
         mv.push_back(*buffer);
@@ -109,7 +112,7 @@ struct DCLImageGL : public DCLBuffer, public QGLFunctions {
     ~DCLImageGL() {glDeleteTextures(1,&id);}
 };
 
-struct DCLRenderBufferGL : public DCLBuffer, public QGLFunctions {
+struct DCLRenderBufferGL : public DCLBuffer, public QOpenGLFunctions_3_0 {
     GLuint fbo, rbo;
     GLenum internalformat;
     GLsizei width, height;
@@ -119,8 +122,9 @@ struct DCLRenderBufferGL : public DCLBuffer, public QGLFunctions {
     void unBind() {glBindFramebuffer(GL_FRAMEBUFFER, 0);}
 
     DCLRenderBufferGL(DOpenCL *fa, GLsizei w, GLsizei h, GLenum _i=GL_RGBA8)
-      : DCLBuffer(fa), QGLFunctions(QGLContext::currentContext()), internalformat(_i), width(w), height(h) {
-        DCL_ERROR_HEAD
+      : DCLBuffer(fa), internalformat(_i), width(w), height(h) {
+        DCL_ERROR_HEAD;
+        qDebug()<<initializeOpenGLFunctions();
         glGenFramebuffers(1, &fbo);
         bind();
 
@@ -129,16 +133,21 @@ struct DCLRenderBufferGL : public DCLBuffer, public QGLFunctions {
         glRenderbufferStorage(GL_RENDERBUFFER, internalformat, width, height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo);
 
-
         buffer = new cl::BufferRenderGL(*(fa->context), flag, rbo);
         mv.push_back(*buffer);
 
         unBind();
-        DCL_ERROR_CATCH("create rbo")
+        DCL_ERROR_CATCH("create rbo");
     }
 
-    virtual void beforeRun() {father->cmdQueue->enqueueAcquireGLObjects(&mv);}
-    virtual void afterRun() {father->cmdQueue->enqueueReleaseGLObjects(&mv);}
+    virtual void beforeRun() {bind();father->cmdQueue->enqueueAcquireGLObjects(&mv);}
+    virtual void afterRun() {father->cmdQueue->enqueueReleaseGLObjects(&mv);unBind();}
+    void show() {
+        bind();
+        glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+        glBlitFramebuffer(0,0,width,height,0,0,width,height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        unBind();
+    }
 };
 
 #endif

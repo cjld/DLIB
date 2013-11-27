@@ -1,0 +1,6 @@
+#ifndef VEBTREE_H
+#define VEBTREE_H
+
+#include "_vebtree/vebtree.cpp"
+
+#endif
