@@ -63,9 +63,16 @@ struct DCLBuffer {
     virtual void afterRun();
 };
 
+struct MemOpt {
+    int before, after;
+    MemOpt(int bef=1, int aft=1) : before(bef), after(aft) {}
+};
+
 struct DCLFunction {
+
 	DOpenCL *father;
 	vector<DCLBuffer*> argv;
+    vector<MemOpt> argOpt;
 	cl::NDRange global,local;
 	cl::Program *program;
 	cl::Kernel *kernel;
@@ -80,9 +87,11 @@ struct DCLFunction {
     void setLocal(int a) {local=cl::NDRange(a);}
     void setLocal(int a, int b) {local=cl::NDRange(a,b);}
     void setLocal(int a, int b, int c) {local=cl::NDRange(a,b,c);}
-	void clearArg();
-	void setArg(DCLBuffer*);
-	void setArg(initializer_list<DCLBuffer*>);
+    void clearArg();
+    void setArg(DCLBuffer*);
+    void setArg(initializer_list<DCLBuffer*>);
+    void setArgOpt(int num, MemOpt opt);
+    void setArgOpt(initializer_list<MemOpt>);
 	void run();
     void run(initializer_list<DCLBuffer*>);
 	virtual ~DCLFunction() {delete program; delete kernel; delete src;}
@@ -91,6 +100,9 @@ struct DCLFunction {
         ifstream fin(name,ios::binary);
         fin.seekg(0,ios::end);
         int len=fin.tellg();
+        if (len<5) {
+            cerr<<"Warning : empty file ."<<endl;
+        }
         fin.seekg(0,ios::beg);
         char *a=new char[len+1];
         fin.read(a,len);
@@ -114,36 +126,36 @@ struct DOpenCL {
     void finish() {cmdQueue->finish();}
 
     void printPlatformInfo() {
-        cout<<endl<<"Platform size : "<<platformList.size()<<endl;
+        cerr<<endl<<"Platform size : "<<platformList.size()<<endl;
         const char name[][20]={"PROFILE","VERSION","NAME","VENDOR","EXTENSIONS"};
         for (size_t i=0; i<platformList.size(); i++) {
-            cout<<endl;
+            cerr<<endl;
             for (size_t j=0; j<=4; j++) {
                 string info;
                 platformList[i].getInfo((cl_platform_info)(CL_PLATFORM_PROFILE+j),&info);
-                cout<<name[j]<<" : "<<info<<endl;
+                cerr<<name[j]<<" : "<<info<<endl;
             }
         }
     }
 
     void printDeviceInfo() {
-        cout<<endl<<"Device size : "<<deviceList.size()<<endl;
+        cerr<<endl<<"Device size : "<<deviceList.size()<<endl;
         for (size_t i=0; i<deviceList.size(); i++) {
-            cout<<endl;
+            cerr<<endl;
             string info;
             deviceList[i].getInfo(CL_DEVICE_NAME,&info);
-            cout<<"CL_DEVICE_NAME : "<<info<<endl;
+            cerr<<"CL_DEVICE_NAME : "<<info<<endl;
             cl_uint size;
             deviceList[i].getInfo(CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS,&size);
-            cout<<"CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS : "<< deviceList[i].getInfo<CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS>() <<endl;
+            cerr<<"CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS : "<< deviceList[i].getInfo<CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS>() <<endl;
             vector<size_t> sizes=deviceList[i].getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
-            cout<<"CL_DEVICE_MAX_WORK_ITEM_SIZES : ";
+            cerr<<"CL_DEVICE_MAX_WORK_ITEM_SIZES : ";
             for (size_t j=0;j<sizes.size();j++)
-                cout<<sizes[j]<<" ";
-            cout<<endl;
-            cout<<"CL_DEVICE_LOCAL_MEM_SIZE : "<<deviceList[i].getInfo<CL_DEVICE_LOCAL_MEM_SIZE>()<<endl;
-            cout<<"CL_DEVICE_MAX_WORK_GROUP_SIZE : "<<deviceList[i].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>()<<endl;
-            cout<<"CL_DEVICE_MAX_COMPUTE_UNITS : "<<deviceList[i].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()<<endl;
+                cerr<<sizes[j]<<" ";
+            cerr<<endl;
+            cerr<<"CL_DEVICE_LOCAL_MEM_SIZE : "<<deviceList[i].getInfo<CL_DEVICE_LOCAL_MEM_SIZE>()<<endl;
+            cerr<<"CL_DEVICE_MAX_WORK_GROUP_SIZE : "<<deviceList[i].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>()<<endl;
+            cerr<<"CL_DEVICE_MAX_COMPUTE_UNITS : "<<deviceList[i].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()<<endl;
         }
     }
 

@@ -50,11 +50,13 @@ DCLFunction::DCLFunction(DOpenCL *fa, string fileName, string kernelName, string
 
 void DCLFunction::clearArg() {
 	argv.clear();
+    argOpt.clear();
 }
 
 void DCLFunction::setArg(DCLBuffer* buffer) {
 	DCL_ERROR_HEAD
 	argv.push_back(buffer);
+    argOpt.push_back(MemOpt());
 	kernel->setArg(argv.size()-1, *(buffer->buffer));
 	DCL_ERROR_CATCH("setArg")
 }
@@ -64,16 +66,24 @@ void DCLFunction::setArg(initializer_list<DCLBuffer*> list) {
 	for (auto x : list) setArg(x);
 }
 
-void DCLFunction::run() {
-	DCL_ERROR_HEAD
+void DCLFunction::setArgOpt(int num, MemOpt opt) {argOpt[num] = opt;}
 
-	for (auto x : argv)
-		if (x->rb) x->beforeRun();
+void DCLFunction::setArgOpt(initializer_list<MemOpt> list) {
+    int i=0;
+    for (auto &x : list)
+        setArgOpt(i++, x);
+}
+
+void DCLFunction::run() {
+    DCL_ERROR_HEAD;
+
+    for (int i=0; i<argv.size(); i++)
+        if (argOpt[i].before && argv[i]->rb) argv[i]->beforeRun();
 
 	father->cmdQueue->enqueueNDRangeKernel(*kernel, cl::NDRange(), global, local);
 
-	for (auto x : argv)
-		if (x->ra) x->afterRun();
+    for (int i=0; i<argv.size(); i++)
+        if (argOpt[i].after && argv[i]->ra) argv[i]->afterRun();
 
 	DCL_ERROR_CATCH("run")
 }
